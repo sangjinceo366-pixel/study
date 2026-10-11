@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>공부 일정 공유</title>
+<title>공부 일정</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0f1218">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="공부 일정">
 <style>
 :root{
   --bg:#0f1218; --panel:#171b23; --panel2:#1e2430; --line:#2a3140;
@@ -130,6 +138,25 @@ dialog h4{margin:0 0 14px;font-size:18px}
 .copyrow input{flex:1;font-size:13px}
 #viewer{width:min(900px,96vw);padding:10px}
 #viewer img{width:100%;max-height:80vh;object-fit:contain;display:block;border-radius:8px}
+.banners{display:grid;gap:8px}
+.bn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+.bn .ic{font-size:22px;flex:none}
+.bn .tx{flex:1;min-width:0;line-height:1.5}
+.bn .tx small{display:block;color:var(--muted);font-size:12px}
+.bn.notice{border-color:rgba(164,109,224,.55);background:rgba(164,109,224,.12)}
+.bn.notice .tx b{font-size:16px;white-space:pre-wrap;word-break:break-word}
+.bn.setup{border-color:rgba(91,141,239,.45);background:rgba(91,141,239,.10)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{font-size:13px;padding:4px 10px;border-radius:999px}
+.check{display:flex!important;grid-template-columns:none!important;align-items:center;gap:8px;color:var(--text)!important;font-size:14px!important}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.stat{font-size:13px;color:var(--muted);line-height:1.6}
+.stat b{color:var(--text)}
+.stat .ok{color:var(--good)}
+details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:6px}
+.steps{margin:0;padding-left:20px;line-height:1.9;font-size:14px}
+.steps b{color:var(--accent)}
+#notifyDlg,#installDlg{width:min(520px,94vw)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;transition:opacity .3s}
 
 @media (max-width:900px){
@@ -175,6 +202,7 @@ dialog h4{margin:0 0 14px;font-size:18px}
     <div class="who" id="whoBox"></div>
     <div class="tools" id="tools"></div>
   </div>
+  <div class="banners" id="banners"></div>
   <div id="tutorBar" class="hidden">
     <div class="students" id="stuList"></div>
   </div>
@@ -306,6 +334,43 @@ dialog h4{margin:0 0 14px;font-size:18px}
   <div class="actions"><span class="spacer"></span><button onclick="linkDlg.close()">취소</button><button class="primary" onclick="linkStudent()">추가</button></div>
 </dialog>
 
+<!-- 선생님: 알림 보내기 -->
+<dialog id="notifyDlg">
+  <h4 id="nHead">알림 보내기</h4>
+  <div class="form">
+    <div class="stat" id="nStat"></div>
+    <div class="chips" id="nChips"></div>
+    <label>보낼 내용<textarea id="nText" rows="4" maxlength="300" placeholder="예: 오늘 수학 숙제 9시까지 인증해!"></textarea></label>
+    <label class="check"><input type="checkbox" id="nPush" checked> 학생 폰에 알림 울리기</label>
+    <label class="check"><input type="checkbox" id="nNotice" checked> 학생 앱 맨 위에 띄우기 (확인하면 표시돼요)</label>
+    <details id="nServer">
+      <summary>알림 서버 설정</summary>
+      <div class="form" style="margin-top:10px">
+        <label>알림 서버 주소<input type="url" id="svUrl" placeholder="https://study-push.xxxx.workers.dev"></label>
+        <label>알림 서버 비밀번호<input type="password" id="svKey" autocomplete="off"></label>
+        <div style="display:flex;gap:8px"><button type="button" onclick="saveServer()">저장</button><button type="button" onclick="testServer()">연결 확인</button><span class="stat" id="svMsg" style="align-self:center"></span></div>
+      </div>
+    </details>
+  </div>
+  <div class="actions">
+    <button onclick="shareKakao()">💬 카톡으로 보내기</button>
+    <span class="spacer"></span>
+    <button onclick="notifyDlg.close()">닫기</button>
+    <button class="primary" id="nSend" onclick="sendNotify()">보내기</button>
+  </div>
+</dialog>
+
+<!-- 앱 설치 안내 -->
+<dialog id="installDlg">
+  <h4>📲 앱으로 설치하고 알림 받기</h4>
+  <div id="insBody"></div>
+  <div class="actions">
+    <span class="spacer"></span>
+    <button class="hidden" id="insBtn" onclick="doInstall()">바로 설치</button>
+    <button class="primary" onclick="installDlg.close()">확인</button>
+  </div>
+</dialog>
+
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
@@ -320,6 +385,8 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "738134376750",
   appId: "1:738134376750:web:f663ce0cffb8e25598babf"
 };
+/* 2) 푸시 알림용 웹 푸시 인증서 키(VAPID) — 설정방법 안내 참고 */
+const VAPID_KEY = "BJzVA8xBvedLmDhjsBdfY2B2-Tda1ohmrHEi64n9ED39ZQaet6FH7nAu4uRlokh3NoBzXx-6I6CWIG6ChNt2Vpo";
 /* ===================================================================== */
 
 const FB_VER='10.12.2';
@@ -328,7 +395,10 @@ const DAYS=['일','월','화','수','목','금','토'];
 const WEEK_ORDER=[1,2,3,4,5,6,0];
 const COLORS=['#5b8def','#e8615a','#3fb68b','#e0a33a','#a46de0','#4bb7c9','#d96aa7'];
 const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const LS={student:'study-share-student-code',tutor:'study-share-tutor-list',demo:'study-share-demo'};
+const LS={student:'study-share-student-code',tutor:'study-share-tutor-list',demo:'study-share-demo',server:'study-share-push-server'};
+const IS_IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const pushSupported=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
 
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -371,7 +441,12 @@ async function makeFirebaseStore(){
     async delTask(c,id){await fs.deleteDoc(fs.doc(db,'students',c,'tasks',id));},
     async putProof(c,p){const {id,...rest}=p;await fs.setDoc(fs.doc(db,'students',c,'proofs',id),rest);},
     async getProof(c,id){const s=await fs.getDoc(fs.doc(db,'students',c,'proofs',id));return s.exists()?s.data():null;},
-    async delProof(c,id){await fs.deleteDoc(fs.doc(db,'students',c,'proofs',id));}
+    async delProof(c,id){await fs.deleteDoc(fs.doc(db,'students',c,'proofs',id));},
+    async pushToken(reg){
+      const m=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-messaging.js`);
+      if(!(await m.isSupported()))throw new Error('unsupported');
+      return m.getToken(m.getMessaging(app),{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+    }
   };
 }
 
@@ -389,7 +464,7 @@ function makeDemoStore(){
   return {
     async exists(c){return !!S(read(),c);},
     async create(c,name){const d=read();d.students[c]={name,classes:[],tasks:{},proofs:{},updatedAt:Date.now()};write(d);},
-    watchStudent(c,cb){return sub(()=>{const s=S(read(),c);cb(s?{name:s.name,classes:s.classes,updatedAt:s.updatedAt}:null);});},
+    watchStudent(c,cb){return sub(()=>{const s=S(read(),c);if(!s){cb(null);return;}const {tasks:_t,proofs:_p,...rest}=s;cb(rest);});},
     watchTasks(c,cb){return sub(()=>{const s=S(read(),c);cb(s?Object.entries(s.tasks).map(([id,t])=>({id,...t})):[]);});},
     async saveStudent(c,patch){const d=read();Object.assign(S(d,c),patch,{updatedAt:Date.now()});write(d);},
     async putTask(c,t){const d=read();const {id,...rest}=t;S(d,c).tasks[id]=rest;S(d,c).updatedAt=Date.now();write(d);},
@@ -397,7 +472,8 @@ function makeDemoStore(){
     async putProof(c,p){const d=read();const {id,...rest}=p;S(d,c).proofs[id]=rest;
       try{write(d);}catch(e){throw new Error('quota');}},
     async getProof(c,id){return (S(read(),c)||{proofs:{}}).proofs[id]||null;},
-    async delProof(c,id){const d=read();delete S(d,c).proofs[id];write(d);}
+    async delProof(c,id){const d=read();delete S(d,c).proofs[id];write(d);},
+    async pushToken(){return 'demo-token-'+uid();}
   };
 }
 
@@ -423,7 +499,7 @@ async function boot(){
   const params=new URLSearchParams(location.search);
   const configured=FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId;
   if(!configured&&!params.has('demo')){show('scrSetup');return;}
-  if(configured){
+  if(configured&&!params.has('demo')){
     try{store=await makeFirebaseStore();}
     catch(e){alert('Firebase에 연결하지 못했어요. 설정값과 인터넷 연결을 확인해 주세요.');console.error(e);return;}
   }else{store=makeDemoStore();isDemo=true;}
@@ -493,11 +569,11 @@ function renderTop(){
   const sync=`<span class="sync ${syncState}" title="실시간 동기화"></span>`;
   if(isStudent()){
     $('whoBox').innerHTML=`${sync}<b>${esc(student?student.name:'')}</b>의 공부 일정${isDemo?' · <span style="color:var(--warn)">데모</span>':''}`;
-    $('tools').innerHTML=`<button onclick="openTimetable()">시간표</button><button class="ghost" onclick="logoutStudent()" title="이 기기에서 코드 지우기">코드 변경</button>`;
+    $('tools').innerHTML=`<button onclick="openTimetable()">시간표</button><button onclick="openInstall()" title="앱 설치·알림 설정">🔔</button><button class="ghost" onclick="logoutStudent()" title="이 기기에서 코드 지우기">코드 변경</button>`;
   }else{
     $('whoBox').innerHTML=`${sync}선생님 화면${student?` · <b>${esc(student.name)}</b>`:''}${isDemo?' · <span style="color:var(--warn)">데모</span>':''}`;
-    $('tools').innerHTML=`${code?`<button onclick="openTimetable()">시간표</button><button onclick="openShare('${code}')">학생 링크</button>`:''}
-      <button class="primary" onclick="openShare()">+ 학생 추가</button><button class="ghost" onclick="linkDlg.showModal()">코드로 추가</button>`;
+    $('tools').innerHTML=`${code?`<button class="primary" onclick="openNotify()">🔔 알림 보내기</button><button onclick="openTimetable()">시간표</button><button onclick="openShare('${code}')">학생 링크</button>`:''}
+      <button onclick="openShare()">+ 학생 추가</button><button class="ghost" onclick="linkDlg.showModal()">코드로 추가</button>`;
   }
   document.querySelectorAll('.student-only').forEach(el=>el.classList.toggle('hidden',!isStudent()));
   $('tutorBar').classList.toggle('hidden',isStudent());
@@ -548,7 +624,7 @@ function renderNow(){
 }
 
 function renderAll(){
-  renderTop();
+  renderTop();renderBanners();
   const key=ymd(sel),isToday=key===ymd(new Date());
   $('selTitle').textContent=fmtDate(sel)+(isToday?' 오늘':'');
   $('clsHead').textContent=`${DAYS[sel.getDay()]}요일 일정`;
@@ -772,6 +848,183 @@ function renderTimetable(){
   $('ttList').innerHTML=h||'<div class="empty">등록된 시간표가 없어요.</div>';
 }
 
+/* =====================================================================
+   앱 설치 · 알림
+   ===================================================================== */
+let swReg=null,installEvt=null;
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(r=>{swReg=r;}).catch(e=>console.warn('sw',e));
+}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;renderBanners();});
+window.addEventListener('appinstalled',()=>{installEvt=null;toast('설치됐어요! 홈 화면의 아이콘으로 열어 주세요');});
+const myPushKey=()=>lsGet('study-share-push-key-'+code,null);
+const notifOn=()=>'Notification' in window&&Notification.permission==='granted'&&!!myPushKey()&&!!(student&&student.push&&student.push[myPushKey()]);
+let bannerHidden=lsGet('study-share-setup-hidden',false);
+
+function renderBanners(){
+  const el=$('banners');if(!el)return;
+  if(!code||!student){el.innerHTML='';return;}
+  let h='';
+  const n=student.notice;
+  if(isStudent()){
+    if(n&&n.text&&!(student.noticeAck>=n.at)){
+      h+=`<div class="bn notice"><div class="ic">📣</div><div class="tx"><small>선생님 메시지 · ${new Date(n.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</small><b>${esc(n.text)}</b></div>
+        <button class="primary" onclick="ackNotice()">확인했어요</button></div>`;
+    }
+    if(!notifOn()&&!bannerHidden){
+      let msg,btn;
+      if(IS_IOS&&!isStandalone()){msg='아이폰은 <b>홈 화면에 추가</b>한 앱에서만 알림을 받을 수 있어요.';btn=`<button class="primary" onclick="openInstall()">방법 보기</button>`;}
+      else if(!pushSupported()){msg='이 브라우저는 알림을 지원하지 않아요. 크롬이나 사파리로 열어 주세요.';btn='';}
+      else if('Notification' in window&&Notification.permission==='denied'){msg='알림이 차단돼 있어요. 휴대폰 설정에서 이 앱(사이트)의 알림을 허용해 주세요.';btn=`<button onclick="openInstall()">방법 보기</button>`;}
+      else{msg='숙제 알림을 받으려면 <b>알림 켜기</b>를 눌러 주세요.';btn=`<button class="primary" onclick="enableNotifications()">🔔 알림 켜기</button>`;}
+      h+=`<div class="bn setup"><div class="ic">🔔</div><div class="tx">${msg}</div>${btn}<button class="ghost" onclick="hideSetup()" title="숨기기">✕</button></div>`;
+    }
+  }else if(n&&n.text){
+    const seen=student.noticeAck>=n.at;
+    h+=`<div class="bn ${seen?'':'notice'}"><div class="ic">📣</div><div class="tx"><small>보낸 메시지 · ${new Date(n.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</small>${esc(n.text)}</div>
+      <span class="stat">${seen?'<span class="ok">✓ 학생 확인함</span>':'아직 안 읽음'}</span></div>`;
+  }
+  el.innerHTML=h;
+}
+function hideSetup(){bannerHidden=true;lsSet('study-share-setup-hidden',true);renderBanners();toast('🔔 버튼에서 언제든 다시 켤 수 있어요');}
+async function ackNotice(){
+  student={...student,noticeAck:Date.now()};renderBanners();
+  await safe(store.saveStudent(code,{noticeAck:student.noticeAck})).catch(()=>{});
+}
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b).slice(0,8),x=>x.toString(16).padStart(2,'0')).join('');}
+async function enableNotifications(){
+  if(!pushSupported()){openInstall();return;}
+  if(IS_IOS&&!isStandalone()){openInstall();return;}
+  if(!isDemo&&!VAPID_KEY){toast('선생님이 알림 설정을 아직 끝내지 않았어요');return;}
+  let perm=Notification.permission;
+  if(perm!=='granted')perm=await Notification.requestPermission();
+  if(perm!=='granted'){toast('알림이 허용되지 않았어요');renderBanners();return;}
+  try{
+    toast('알림 등록 중…');
+    const reg=swReg||await navigator.serviceWorker.ready;
+    const token=await store.pushToken(reg);
+    if(!token)throw new Error('no token');
+    const key=await sha(token);
+    const dev=(IS_IOS?'iPhone':/Android/.test(navigator.userAgent)?'Android':'PC');
+    const push={...((student&&student.push)||{})};
+    // 이 기기의 예전 토큰은 정리
+    const old=myPushKey();if(old&&old!==key)delete push[old];
+    push[key]={token,at:Date.now(),device:dev};
+    lsSet('study-share-push-key-'+code,key);
+    student={...student,push};renderBanners();
+    await store.saveStudent(code,{push});
+    toast('알림이 켜졌어요 🔔');
+    if(installDlg.open)renderInstall();
+  }catch(e){console.error(e);toast('알림 등록에 실패했어요. 잠시 뒤 다시 해 주세요');}
+}
+function openInstall(){renderInstall();installDlg.showModal();}
+function renderInstall(){
+  let h='';
+  const st=isStandalone();
+  if(IS_IOS){
+    h+=`<p class="msg">아이폰은 iOS 16.4 이상에서, <b>홈 화면에 추가한 앱</b>으로 열어야 알림을 받을 수 있어요.</p>
+    <ol class="steps">
+      <li><b>사파리</b>로 이 링크를 열어요 (카톡 안 브라우저 말고: 카톡에서 링크 → 오른쪽 아래 ⋯ → <b>Safari로 열기</b>)</li>
+      <li>아래쪽 <b>공유 버튼(□↑)</b>을 눌러요</li>
+      <li>목록을 내려서 <b>홈 화면에 추가</b> → 오른쪽 위 <b>추가</b></li>
+      <li>홈 화면에 생긴 <b>공부 일정</b> 아이콘으로 열어요</li>
+      <li>위쪽의 <b>🔔 알림 켜기</b> → <b>허용</b></li>
+    </ol>`;
+  }else{
+    h+=`<ol class="steps">
+      <li><b>크롬</b>으로 이 링크를 열어요 (카톡에서 링크 → 오른쪽 위 ⋮ → <b>다른 브라우저로 열기</b>)</li>
+      <li>${installEvt?'아래 <b>바로 설치</b> 버튼을 누르거나, ':''}오른쪽 위 <b>⋮ 메뉴</b> → <b>홈 화면에 추가</b>(또는 <b>앱 설치</b>)</li>
+      <li>홈 화면에 생긴 <b>공부 일정</b> 아이콘으로 열어요</li>
+      <li>위쪽의 <b>🔔 알림 켜기</b> → <b>허용</b></li>
+    </ol>`;
+  }
+  const perm=('Notification' in window)?Notification.permission:'unsupported';
+  h+=`<div class="stat" style="margin-top:14px">지금 상태: ${st?'<span class="ok">앱으로 열림 ✓</span>':'브라우저로 열림'} · 알림 ${notifOn()?'<span class="ok">켜짐 ✓</span>':perm==='denied'?'<b style="color:var(--bad)">차단됨</b> — 휴대폰 설정 → 알림에서 허용해 주세요':'꺼짐'}</div>`;
+  if(!notifOn()&&pushSupported()&&!(IS_IOS&&!st)&&perm!=='denied')h+=`<div style="margin-top:12px"><button class="primary" onclick="enableNotifications()">🔔 지금 알림 켜기</button></div>`;
+  if(notifOn())h+=`<div style="margin-top:12px"><button onclick="testLocal()">알림 테스트</button></div>`;
+  $('insBody').innerHTML=h;
+  $('insBtn').classList.toggle('hidden',!installEvt);
+}
+async function doInstall(){if(!installEvt)return;installEvt.prompt();await installEvt.userChoice.catch(()=>{});installEvt=null;renderInstall();}
+async function testLocal(){
+  const reg=swReg||await navigator.serviceWorker.ready;
+  reg.showNotification('공부 일정',{body:'알림이 잘 와요! 🔔',icon:'icon-192.png'});
+}
+
+/* ---------- 선생님: 알림 보내기 ---------- */
+const server=()=>lsGet(LS.server,{url:'',key:''});
+function openNotify(){
+  if(!code||!student)return;
+  const devs=Object.values(student.push||{});
+  $('nHead').textContent=`${student.name}에게 알림 보내기`;
+  $('nStat').innerHTML=devs.length
+    ?`알림 받는 기기 <b>${devs.length}대</b> (${devs.map(d=>esc(d.device||'기기')).join(', ')})`
+    :`<b style="color:var(--warn)">학생이 아직 알림을 켜지 않았어요.</b> 학생에게 링크를 열고 🔔 알림 켜기를 누르라고 해 주세요. 그 전까지는 앱 화면 메시지와 카톡으로 보낼 수 있어요.`;
+  $('nPush').checked=devs.length>0;$('nPush').disabled=!devs.length;
+  const k=ymd(new Date());
+  const left=tasks.filter(t=>t.date===k&&!t.done),over=tasks.filter(t=>t.date<k&&!t.done);
+  const tpl=[
+    ['오늘 할 일',left.length?`오늘 남은 할 일 ${left.length}개! ${left.slice(0,3).map(t=>t.title).join(', ')}${left.length>3?' 외':''} — 사진 인증까지 해야 완료야`:'오늘 할 일 다 했는지 확인하고 인증 사진 올려줘!'],
+    ['밀린 숙제',over.length?`밀린 숙제가 ${over.length}개 있어. 오늘 안에 끝내고 인증해줘!`:'밀린 숙제 없는지 확인해줘!'],
+    ['인증 요청','숙제한 거 사진 찍어서 인증 올려줘 📷'],
+    ['수업 전','곧 수업이야! 숙제랑 교재 챙겨와'],
+  ];
+  $('nChips').innerHTML=tpl.map((t,i)=>`<button type="button" data-i="${i}">${t[0]}</button>`).join('');
+  $('nChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('nText').value=tpl[b.dataset.i][1];});
+  if(!$('nText').value)$('nText').value=tpl[0][1];
+  const sv=server();$('svUrl').value=sv.url||'';$('svKey').value=sv.key||'';$('svMsg').textContent='';
+  $('nServer').open=!sv.url&&!isDemo;
+  notifyDlg.showModal();
+}
+function saveServer(){
+  const url=$('svUrl').value.trim().replace(/\/+$/,''),key=$('svKey').value;
+  lsSet(LS.server,{url,key});$('svMsg').textContent='저장했어요';
+}
+async function callServer(path,body){
+  const sv=server();
+  if(!sv.url||!sv.key)throw new Error('알림 서버 설정이 필요해요');
+  const r=await fetch(sv.url+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...body,key:sv.key})});
+  let j={};try{j=await r.json();}catch(e){}
+  if(!r.ok)throw new Error(j.error||('서버 오류 '+r.status));
+  return j;
+}
+async function testServer(){
+  saveServer();$('svMsg').textContent='확인 중…';
+  try{await callServer('/ping',{});$('svMsg').innerHTML='<span class="ok">연결됐어요 ✓</span>';}
+  catch(e){$('svMsg').innerHTML=`<span style="color:var(--bad)">${esc(e.message)}</span>`;}
+}
+async function sendNotify(){
+  const text=$('nText').value.trim();if(!text){$('nText').focus();return;}
+  const doPush=$('nPush').checked&&!$('nPush').disabled,doNotice=$('nNotice').checked;
+  if(!doPush&&!doNotice){toast('보낼 방법을 하나 이상 골라 주세요');return;}
+  $('nSend').disabled=true;
+  const results=[];
+  try{
+    if(doNotice){
+      const notice={text,at:Date.now()};
+      student={...student,notice};renderBanners();
+      await store.saveStudent(code,{notice});results.push('앱 화면 ✓');
+    }
+    if(doPush){
+      if(isDemo){results.push('폰 알림(데모라 실제로는 안 보내져요)');}
+      else{
+        try{const r=await callServer('/send',{code,title:'📣 선생님 메시지',body:text});
+          results.push(r.sent?`폰 알림 ${r.sent}대 ✓`:'폰 알림 실패 — 학생이 알림을 다시 켜야 할 수 있어요');}
+        catch(e){results.push('폰 알림 실패: '+e.message);$('nServer').open=true;}
+      }
+    }
+    toast(results.join(' · '));
+    if(results.every(r=>r.includes('✓')||r.includes('데모')))notifyDlg.close();
+  }catch(e){console.error(e);toast('보내지 못했어요');}
+  finally{$('nSend').disabled=false;}
+}
+async function shareKakao(){
+  const text=$('nText').value.trim()||'숙제 확인해줘!';
+  const msg=`[공부 일정] ${text}\n\n👉 ${studentLink(code)}`;
+  if(navigator.share){try{await navigator.share({text:msg});return;}catch(e){if(e.name==='AbortError')return;}}
+  copyText(msg);toast('복사했어요. 카톡 대화창에 붙여 넣으세요');
+}
+
 /* ---------- 선생님: 학생 관리 ---------- */
 function selectStudent(c){attach(c);}
 function studentLink(c){const u=new URL(location.href);u.search='';if(isDemo)u.searchParams.set('demo','1');u.searchParams.set('s',c);return u.toString();}
@@ -813,7 +1066,8 @@ async function linkStudent(){
 Object.assign(window,{startDemo,enterCode,goTutor,logoutStudent,openTimetable,openShare,createStudent,removeStudent,linkStudent,
   selectStudent,shiftDay,goToday,selectDay,addTask,toggleTask,moveToToday,openTask,saveTask,deleteTask,openProof,addProofFiles,
   viewProof,removeProof,completeWithProof,openClass,saveClass,deleteClass,pickColorSet,copyText,
-  openProofEdit:()=>openProof(editTaskId)});
+  openProofEdit:()=>openProof(editTaskId),
+  ackNotice,hideSetup,enableNotifications,openInstall,doInstall,testLocal,openNotify,saveServer,testServer,sendNotify,shareKakao});
 
 boot();tick();setInterval(tick,1000);
 </script>
