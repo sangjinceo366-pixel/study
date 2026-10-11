@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>공부 일정 공유</title>
+<style>
+:root{
+  --bg:#0f1218; --panel:#171b23; --panel2:#1e2430; --line:#2a3140;
+  --text:#e8ecf3; --muted:#8b95a7; --accent:#5b8def; --good:#3fb68b; --warn:#e0a33a; --bad:#e8615a; --hw:#a46de0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+  font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--bad)}
+button.ghost{background:none;border:none;color:var(--muted);padding:4px 6px}
+button.ghost:hover{color:var(--text)}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.hidden{display:none!important}
+
+/* ---------- 시작/설정 화면 ---------- */
+.center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;width:min(440px,100%)}
+.box h1{margin:0 0 6px;font-size:22px}
+.box p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 18px}
+.box .stack{display:grid;gap:10px}
+.box .big{padding:12px;font-size:16px}
+.box input.code{font-size:20px;letter-spacing:.12em;text-align:center;text-transform:uppercase}
+.note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6}
+.banner{background:rgba(224,163,58,.12);border:1px solid rgba(224,163,58,.4);color:var(--warn);font-size:13px;padding:8px 12px;border-radius:10px}
+
+/* ---------- 앱 ---------- */
+.app>*,.main>*{min-width:0}
+.app{min-height:100vh;display:grid;grid-template-rows:auto auto 1fr auto;gap:14px;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.top .nav{display:flex;align-items:center;gap:8px}
+.top h2{margin:0;font-size:19px;font-weight:600;min-width:170px;text-align:center}
+.top .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.who{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.who b{color:var(--text)}
+.sync{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.sync.ok{background:var(--good)} .sync.err{background:var(--bad)}
+
+.main{display:grid;grid-template-columns:1fr 1.1fr 1.3fr;gap:14px;min-height:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;min-height:0}
+.panel h3{margin:0 0 12px;font-size:14px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.scroll{overflow-y:auto;min-height:0;flex:1}
+
+.clock{font-size:clamp(48px,6.5vw,96px);font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.clock small{font-size:.35em;color:var(--muted);font-weight:500;margin-left:6px}
+.today{color:var(--muted);font-size:16px;margin:10px 0 18px}
+.card{background:var(--panel2);border-radius:12px;padding:12px 14px;margin-bottom:10px;border-left:4px solid var(--accent)}
+.card .lbl{font-size:12px;color:var(--muted);margin-bottom:4px}
+.card .ttl{font-size:19px;font-weight:600}
+.card .sub{font-size:13px;color:var(--muted);margin-top:4px}
+.card.now{border-left-color:var(--good)} .card.none{border-left-color:var(--line)}
+.card.alert{border-left-color:var(--warn)}
+.progress{height:6px;background:var(--line);border-radius:3px;margin-top:10px;overflow:hidden}
+.progress>div{height:100%;background:var(--good)}
+
+.cls{display:flex;gap:12px;align-items:stretch;padding:10px 12px;border-radius:10px;margin-bottom:8px;background:var(--panel2)}
+.cls.click{cursor:pointer} .cls.click:hover{outline:1px solid var(--line)}
+.cls .bar{width:4px;border-radius:2px;flex:none}
+.cls .t{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px;width:96px;flex:none}
+.cls .n{font-weight:600} .cls .r{font-size:13px;color:var(--muted)}
+.cls.cur{outline:2px solid var(--good)} .cls.past{opacity:.45}
+.empty{color:var(--muted);font-size:14px;padding:8px 2px;line-height:1.6}
+
+.add{display:flex;gap:8px;margin-bottom:12px}
+.add input[type=text]{flex:1}
+.add input[type=time]{width:112px}
+.task{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:var(--panel2);margin-bottom:7px}
+.task input[type=checkbox]{width:22px;height:22px;accent-color:var(--good);flex:none;cursor:pointer}
+.task .chk{width:22px;height:22px;flex:none;border-radius:5px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px}
+.task .chk.on{background:var(--good);border-color:var(--good);color:#fff}
+.task .body{flex:1;min-width:0;cursor:pointer}
+.task .title{word-break:break-word}
+.task .meta{font-size:12px;color:var(--muted);margin-top:2px}
+.task .time{font-variant-numeric:tabular-nums;color:var(--accent);font-size:13px;margin-right:6px}
+.task.done .title{text-decoration:line-through;color:var(--muted)}
+.tag{display:inline-block;text-decoration:none;font-size:11px;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:1px;white-space:nowrap}
+.tag.hw{background:rgba(164,109,224,.18);color:#c9a6f2}
+.tag.pf{color:var(--good);cursor:pointer;padding:1px 2px}
+.section{font-size:12px;color:var(--warn);margin:14px 0 8px;font-weight:600}
+
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.day{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 11px;cursor:pointer}
+.day:hover{border-color:var(--accent)}
+.day.sel{border-color:var(--accent);background:var(--panel2)}
+.day .d{font-weight:600} .day.is-today .d{color:var(--accent)}
+.day .s{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* 선생님: 학생 목록 */
+.students{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.stu{flex:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 14px;cursor:pointer;text-align:left}
+.stu.sel{border-color:var(--accent);background:var(--panel2)}
+.stu .nm{font-weight:600} .stu .st{font-size:12px;color:var(--muted)}
+
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(460px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h4{margin:0 0 14px;font-size:18px}
+.form{display:grid;gap:12px}
+.form label{display:grid;gap:5px;font-size:13px;color:var(--muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.actions .spacer{flex:1}
+.colors{display:flex;gap:8px}
+.colors span{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.colors span.on{border-color:#fff}
+#ttDlg,#proofDlg,#shareDlg{width:min(580px,94vw)}
+.ttList{max-height:50vh;overflow-y:auto}
+.ttDay{font-size:13px;color:var(--muted);margin:12px 0 6px}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted);cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--text);background:rgba(91,141,239,.08)}
+.drop b{color:var(--text)}
+.proofs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px}
+.pf{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer}
+.pf .th{height:90px;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-size:12px}
+.pf .th img{width:100%;height:100%;object-fit:cover}
+.pf .nm{font-size:11px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.pf .x{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);border:none;border-radius:50%;width:22px;height:22px;padding:0;font-size:12px;line-height:22px;color:#fff}
+.msg{font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6}
+.copyrow{display:flex;gap:8px;margin-bottom:10px}
+.copyrow input{flex:1;font-size:13px}
+#viewer{width:min(900px,96vw);padding:10px}
+#viewer img{width:100%;max-height:80vh;object-fit:contain;display:block;border-radius:8px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;transition:opacity .3s}
+
+@media (max-width:900px){
+  .app{padding:12px}
+  .main{grid-template-columns:1fr}
+  .clock{font-size:52px}
+  .week{grid-template-columns:repeat(7,minmax(64px,1fr));overflow-x:auto}
+  .day{padding:7px 8px} .day .s{font-size:11px}
+  .top h2{min-width:0;font-size:17px}
+  .scroll{overflow:visible}
+}
+</style>
+</head>
+<body>
+
+<!-- 설정 안 됨 -->
+<div class="center hidden" id="scrSetup">
+  <div class="box">
+    <h1>설정이 필요해요</h1>
+    <p>이 파일 맨 위쪽의 <b>FIREBASE_CONFIG</b>에 Firebase 설정값을 붙여 넣어야 학생과 일정이 공유돼요. 설정 방법은 함께 드린 <b>설정방법</b> 안내를 보세요.</p>
+    <div class="stack"><button class="big" onclick="startDemo()">설정 없이 데모로 둘러보기</button></div>
+    <div class="note">데모는 이 브라우저 안에서만 저장되고 다른 사람과 공유되지 않아요.</div>
+  </div>
+</div>
+
+<!-- 시작 -->
+<div class="center hidden" id="scrHome">
+  <div class="box">
+    <h1>공부 일정 공유</h1>
+    <p>학생은 선생님께 받은 코드를 입력하세요.</p>
+    <div class="stack">
+      <input class="code" id="codeIn" placeholder="학생 코드" maxlength="20" autocomplete="off" onkeydown="if(event.key==='Enter')enterCode()">
+      <button class="primary big" onclick="enterCode()">시작하기</button>
+    </div>
+    <div class="note" style="text-align:center;margin-top:22px"><button class="ghost" onclick="goTutor()">선생님 화면으로 →</button></div>
+    <div class="banner hidden" id="demoBanner" style="margin-top:14px">데모 모드 · 이 브라우저에만 저장돼요</div>
+  </div>
+</div>
+
+<!-- 메인 앱 -->
+<div class="app hidden" id="scrApp">
+  <div class="top">
+    <div class="who" id="whoBox"></div>
+    <div class="tools" id="tools"></div>
+  </div>
+  <div id="tutorBar" class="hidden">
+    <div class="students" id="stuList"></div>
+  </div>
+  <div class="main" id="mainArea">
+    <div class="panel">
+      <div class="clock" id="clock"></div>
+      <div class="today" id="todayStr"></div>
+      <div id="nowCards"></div>
+    </div>
+    <div class="panel">
+      <h3><span id="clsHead">수업</span><button class="ghost student-only" onclick="openClass()">+ 수업 추가</button></h3>
+      <div class="scroll" id="classList"></div>
+    </div>
+    <div class="panel">
+      <h3><span id="taskHead">할 일</span>
+        <span class="nav" style="display:flex;gap:4px;align-items:center">
+          <button class="ghost" onclick="shiftDay(-1)" title="이전 날">◀</button>
+          <span id="selTitle" style="font-size:13px;color:var(--text)"></span>
+          <button class="ghost" onclick="shiftDay(1)" title="다음 날">▶</button>
+          <button class="ghost" onclick="goToday()">오늘</button>
+        </span>
+      </h3>
+      <form class="add" onsubmit="addTask(event)">
+        <input type="text" id="newTitle" autocomplete="off">
+        <input type="time" id="newTime" title="시간 (선택)">
+        <button class="primary" type="submit">추가</button>
+      </form>
+      <div class="scroll" id="taskList"></div>
+    </div>
+  </div>
+  <div class="week" id="week"></div>
+</div>
+
+<!-- 할 일 편집 -->
+<dialog id="taskDlg">
+  <h4 id="tHead">할 일 수정</h4>
+  <div class="form">
+    <label>내용<input type="text" id="tTitle"></label>
+    <div class="row2">
+      <label>날짜<input type="date" id="tDate"></label>
+      <label>시간 (선택)<input type="time" id="tTime"></label>
+    </div>
+    <label>메모<textarea id="tNote" rows="3"></textarea></label>
+    <button type="button" id="tProofBtn" onclick="taskDlg.close();openProofEdit()"></button>
+  </div>
+  <div class="actions">
+    <button class="danger" id="tDel" onclick="deleteTask()">삭제</button>
+    <span class="spacer"></span>
+    <button onclick="taskDlg.close()">취소</button>
+    <button class="primary" id="tSave" onclick="saveTask()">저장</button>
+  </div>
+</dialog>
+
+<!-- 공부 인증 -->
+<dialog id="proofDlg">
+  <h4 id="pHead">공부 인증</h4>
+  <p class="msg" id="pMsg"></p>
+  <div class="drop student-only" id="drop" onclick="proofInput.click()">
+    📷 <b>공부한 흔적을 사진으로 올려 주세요</b><br>
+    <span style="font-size:13px">필기, 문제 풀이, 교재 페이지 등 · 클릭/촬영 또는 끌어다 놓기</span>
+  </div>
+  <input type="file" id="proofInput" accept="image/*" multiple hidden onchange="addProofFiles(this.files);this.value=''">
+  <div class="proofs" id="proofList"></div>
+  <div class="actions">
+    <span class="spacer"></span>
+    <button onclick="proofDlg.close()">닫기</button>
+    <button class="primary student-only" id="pDone" onclick="completeWithProof()">인증하고 완료</button>
+  </div>
+</dialog>
+
+<!-- 사진 크게 보기 -->
+<dialog id="viewer" onclick="viewer.close()"><img id="viewerImg" alt=""></dialog>
+
+<!-- 수업 편집 -->
+<dialog id="classDlg">
+  <h4 id="cHead">수업</h4>
+  <div class="form">
+    <label>과목/일정<input type="text" id="cName" placeholder="예: 수학 학원"></label>
+    <label>요일<select id="cDay"></select></label>
+    <div class="row2">
+      <label>시작<input type="time" id="cStart" value="09:00"></label>
+      <label>종료<input type="time" id="cEnd" value="10:00"></label>
+    </div>
+    <label>장소 (선택)<input type="text" id="cRoom"></label>
+    <label>색상<div class="colors" id="cColors"></div></label>
+  </div>
+  <div class="actions">
+    <button class="danger" id="cDel" onclick="deleteClass()">삭제</button>
+    <span class="spacer"></span>
+    <button onclick="classDlg.close()">취소</button>
+    <button class="primary" onclick="saveClass()">저장</button>
+  </div>
+</dialog>
+
+<!-- 주간 시간표 -->
+<dialog id="ttDlg">
+  <h4>주간 시간표</h4>
+  <div class="ttList" id="ttList"></div>
+  <div class="actions">
+    <span class="spacer"></span>
+    <button class="student-only" onclick="openClass()">+ 추가</button>
+    <button class="primary" onclick="ttDlg.close()">닫기</button>
+  </div>
+</dialog>
+
+<!-- 학생 추가/공유 -->
+<dialog id="shareDlg">
+  <h4 id="shHead">학생 추가</h4>
+  <div id="shNew" class="form">
+    <label>학생 이름<input type="text" id="shName" placeholder="예: 민수"></label>
+  </div>
+  <div id="shDone" class="hidden">
+    <p class="msg">아래 링크를 학생에게 보내 주세요. 링크를 열면 바로 학생 화면이 열려요. 이 링크(코드)를 아는 사람은 누구나 이 학생 일정을 볼 수 있으니 학생에게만 보내 주세요.</p>
+    <div class="copyrow"><input id="shLink" readonly><button onclick="copyText(shLink.value)">복사</button></div>
+    <div class="copyrow"><input id="shCode" readonly><button onclick="copyText(shCode.value)">코드 복사</button></div>
+  </div>
+  <div class="actions">
+    <button class="danger hidden" id="shRemove" onclick="removeStudent()">내 목록에서 빼기</button>
+    <span class="spacer"></span>
+    <button onclick="shareDlg.close()">닫기</button>
+    <button class="primary" id="shCreate" onclick="createStudent()">만들기</button>
+  </div>
+</dialog>
+
+<!-- 선생님 목록에 기존 코드 추가 -->
+<dialog id="linkDlg">
+  <h4>기존 학생 코드로 추가</h4>
+  <div class="form"><label>학생 코드<input type="text" id="lkCode" class="code" style="text-transform:uppercase"></label></div>
+  <div class="actions"><span class="spacer"></span><button onclick="linkDlg.close()">취소</button><button class="primary" onclick="linkStudent()">추가</button></div>
+</dialog>
+
+<div class="toast hidden" id="toast"></div>
+
+<script type="module">
+/* =====================================================================
+   1) Firebase 설정값을 여기에 붙여 넣으세요 (설정방법 안내 참고)
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBGVTzwtuwrKZePLrJ2kHL2wE_NVTRpuB8",
+  authDomain: "siwoo-human-made.firebaseapp.com",
+  projectId: "siwoo-human-made",
+  storageBucket: "siwoo-human-made.firebasestorage.app",
+  messagingSenderId: "738134376750",
+  appId: "1:738134376750:web:f663ce0cffb8e25598babf"
+};
+/* ===================================================================== */
+
+const FB_VER='10.12.2';
+const $=id=>document.getElementById(id);
+const DAYS=['일','월','화','수','목','금','토'];
+const WEEK_ORDER=[1,2,3,4,5,6,0];
+const COLORS=['#5b8def','#e8615a','#3fb68b','#e0a33a','#a46de0','#4bb7c9','#d96aa7'];
+const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const LS={student:'study-share-student-code',tutor:'study-share-tutor-list',demo:'study-share-demo'};
+
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x;}
+function parseYmd(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function fmtDate(d){return `${d.getMonth()+1}/${d.getDate()} (${DAYS[d.getDay()]})`;}
+function fmtDur(min){if(min<60)return `${min}분`;const h=Math.floor(min/60),m=min%60;return m?`${h}시간 ${m}분`:`${h}시간`;}
+function newCode(){const a=new Uint32Array(12);crypto.getRandomValues(a);return Array.from(a,x=>CODE_CHARS[x%CODE_CHARS.length]).join('');}
+const normCode=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function lsGet(k,def){try{const v=localStorage.getItem(k);return v===null?def:JSON.parse(v);}catch(e){return def;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+let toastT;function toast(m){const t=$('toast');t.textContent=m;t.classList.remove('hidden');t.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>{t.style.opacity=0;setTimeout(()=>t.classList.add('hidden'),300);},2200);}
+async function copyText(s){try{await navigator.clipboard.writeText(s);toast('복사했어요');}catch(e){prompt('복사해서 쓰세요',s);}}
+
+/* =====================================================================
+   저장소: Firebase(Firestore) 또는 데모(이 브라우저)
+   구조: students/{code}            {name, classes[], updatedAt}
+         students/{code}/tasks/{id}  {title,date,time,note,done,by,proofs[]}
+         students/{code}/proofs/{id} {taskId,name,data(jpeg dataURL),at}
+   ===================================================================== */
+let store=null, isDemo=false;
+
+async function makeFirebaseStore(){
+  const appMod=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app.js`);
+  const fs=await import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`);
+  const app=appMod.initializeApp(FIREBASE_CONFIG);
+  let db;
+  try{db=fs.initializeFirestore(app,{localCache:fs.persistentLocalCache()});}catch(e){db=fs.getFirestore(app);}
+  const sdoc=c=>fs.doc(db,'students',c);
+  return {
+    async exists(c){return (await fs.getDoc(sdoc(c))).exists();},
+    async create(c,name){await fs.setDoc(sdoc(c),{name,classes:[],createdAt:Date.now(),updatedAt:Date.now()});},
+    watchStudent(c,cb,err){return fs.onSnapshot(sdoc(c),s=>cb(s.exists()?s.data():null),err);},
+    watchTasks(c,cb,err){return fs.onSnapshot(fs.collection(db,'students',c,'tasks'),s=>cb(s.docs.map(d=>({id:d.id,...d.data()}))),err);},
+    async saveStudent(c,patch){await fs.setDoc(sdoc(c),{...patch,updatedAt:Date.now()},{merge:true});},
+    async putTask(c,t){const {id,...rest}=t;await fs.setDoc(fs.doc(db,'students',c,'tasks',id),rest);await fs.setDoc(sdoc(c),{updatedAt:Date.now()},{merge:true});},
+    async delTask(c,id){await fs.deleteDoc(fs.doc(db,'students',c,'tasks',id));},
+    async putProof(c,p){const {id,...rest}=p;await fs.setDoc(fs.doc(db,'students',c,'proofs',id),rest);},
+    async getProof(c,id){const s=await fs.getDoc(fs.doc(db,'students',c,'proofs',id));return s.exists()?s.data():null;},
+    async delProof(c,id){await fs.deleteDoc(fs.doc(db,'students',c,'proofs',id));}
+  };
+}
+
+function makeDemoStore(){
+  // 이 브라우저의 localStorage에 저장. 같은 브라우저의 다른 탭과는 실시간 동기화.
+  const K=LS.demo, ch=('BroadcastChannel' in window)?new BroadcastChannel('study-share-demo'):null;
+  const subs=new Set();
+  const read=()=>lsGet(K,{students:{}});
+  const write=d=>{lsSet(K,d);fire();ch&&ch.postMessage(1);};
+  const fire=()=>subs.forEach(f=>f());
+  ch&&ch.addEventListener('message',fire);
+  window.addEventListener('storage',e=>{if(e.key===K)fire();});
+  const S=(d,c)=>d.students[c];
+  const sub=fn=>{subs.add(fn);setTimeout(fn,0);return()=>subs.delete(fn);};
+  return {
+    async exists(c){return !!S(read(),c);},
+    async create(c,name){const d=read();d.students[c]={name,classes:[],tasks:{},proofs:{},updatedAt:Date.now()};write(d);},
+    watchStudent(c,cb){return sub(()=>{const s=S(read(),c);cb(s?{name:s.name,classes:s.classes,updatedAt:s.updatedAt}:null);});},
+    watchTasks(c,cb){return sub(()=>{const s=S(read(),c);cb(s?Object.entries(s.tasks).map(([id,t])=>({id,...t})):[]);});},
+    async saveStudent(c,patch){const d=read();Object.assign(S(d,c),patch,{updatedAt:Date.now()});write(d);},
+    async putTask(c,t){const d=read();const {id,...rest}=t;S(d,c).tasks[id]=rest;S(d,c).updatedAt=Date.now();write(d);},
+    async delTask(c,id){const d=read();delete S(d,c).tasks[id];write(d);},
+    async putProof(c,p){const d=read();const {id,...rest}=p;S(d,c).proofs[id]=rest;
+      try{write(d);}catch(e){throw new Error('quota');}},
+    async getProof(c,id){return (S(read(),c)||{proofs:{}}).proofs[id]||null;},
+    async delProof(c,id){const d=read();delete S(d,c).proofs[id];write(d);}
+  };
+}
+
+/* =====================================================================
+   상태
+   ===================================================================== */
+let role=null;              // 'student' | 'tutor'
+let code=null;              // 지금 보고 있는 학생 코드
+let student=null;           // {name, classes}
+let tasks=[];               // 학생의 할 일
+let unsubs=[];
+let sel=startOfDay(new Date());
+let lastToday=ymd(new Date());
+let editTaskId=null, editClassId=null, proofTaskId=null, pickColor=COLORS[0];
+let tutorList=lsGet(LS.tutor,[]);   // [{code,name}]
+let syncState='';
+
+function show(id){['scrSetup','scrHome','scrApp'].forEach(s=>$(s).classList.toggle('hidden',s!==id));}
+function setSync(s){syncState=s;const el=document.querySelector('.sync');if(el)el.className='sync '+s;}
+
+/* ---------- 시작 ---------- */
+async function boot(){
+  const params=new URLSearchParams(location.search);
+  const configured=FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId;
+  if(!configured&&!params.has('demo')){show('scrSetup');return;}
+  if(configured){
+    try{store=await makeFirebaseStore();}
+    catch(e){alert('Firebase에 연결하지 못했어요. 설정값과 인터넷 연결을 확인해 주세요.');console.error(e);return;}
+  }else{store=makeDemoStore();isDemo=true;}
+  $('demoBanner').classList.toggle('hidden',!isDemo);
+
+  const s=normCode(params.get('s'));
+  if(s){await openAsStudent(s,true);return;}
+  if(params.has('t')){openTutor();return;}
+  const saved=lsGet(LS.student,null);
+  if(saved){await openAsStudent(saved,false);return;}
+  show('scrHome');
+}
+function startDemo(){const u=new URL(location.href);u.searchParams.set('demo','1');location.href=u.toString();}
+function keepParams(extra){const u=new URL(location.href);['s','t'].forEach(k=>u.searchParams.delete(k));Object.entries(extra||{}).forEach(([k,v])=>u.searchParams.set(k,v));return u;}
+
+async function enterCode(){
+  const c=normCode($('codeIn').value);
+  if(c.length<10){toast('코드를 다시 확인해 주세요');return;}
+  await openAsStudent(c,true);
+}
+async function openAsStudent(c,fromLink){
+  try{
+    if(!(await store.exists(c))){
+      if(fromLink)toast('없는 코드예요. 선생님께 다시 확인해 주세요.');
+      lsSet(LS.student,null);show('scrHome');return;
+    }
+  }catch(e){toast('연결에 실패했어요');show('scrHome');return;}
+  lsSet(LS.student,c);
+  history.replaceState(null,'',keepParams({s:c}));
+  role='student';attach(c);
+}
+function goTutor(){history.replaceState(null,'',keepParams({t:'1'}));openTutor();}
+function openTutor(){
+  role='tutor';
+  if(tutorList.length)attach(tutorList[0].code);
+  else{code=null;student=null;tasks=[];show('scrApp');renderAll();}
+}
+function logoutStudent(){
+  if(!confirm('이 기기에서 학생 코드를 지울까요? (일정은 지워지지 않아요)'))return;
+  lsSet(LS.student,null);unsubs.forEach(f=>f&&f());unsubs=[];
+  history.replaceState(null,'',keepParams());$('codeIn').value='';show('scrHome');
+}
+
+function attach(c){
+  unsubs.forEach(f=>f&&f());unsubs=[];
+  code=c;student=null;tasks=[];setSync('');
+  show('scrApp');renderAll();
+  const err=e=>{console.error(e);setSync('err');toast('동기화 오류 — 인터넷 연결을 확인해 주세요');};
+  unsubs.push(store.watchStudent(c,s=>{student=s;setSync('ok');
+    if(role==='tutor'&&s){const it=tutorList.find(x=>x.code===c);if(it&&it.name!==s.name){it.name=s.name;lsSet(LS.tutor,tutorList);}}
+    renderAll();},err));
+  unsubs.push(store.watchTasks(c,t=>{tasks=t;setSync('ok');renderAll();if(proofDlg.open)renderProofs();},err));
+}
+
+/* ---------- 데이터 헬퍼 ---------- */
+const classes=()=>(student&&student.classes)||[];
+const classesOn=d=>classes().filter(c=>c.day===d.getDay()).sort((a,b)=>toMin(a.start)-toMin(b.start));
+const tasksOn=key=>tasks.filter(t=>t.date===key).sort((a,b)=>(a.done-b.done)||((a.time||'99')<(b.time||'99')?-1:(a.time||'99')>(b.time||'99')?1:0));
+const findTask=id=>tasks.find(x=>x.id===id);
+const isStudent=()=>role==='student';
+async function safe(p,msg){try{return await p;}catch(e){console.error(e);toast(msg||'저장에 실패했어요');throw e;}}
+
+/* =====================================================================
+   렌더
+   ===================================================================== */
+function renderTop(){
+  const sync=`<span class="sync ${syncState}" title="실시간 동기화"></span>`;
+  if(isStudent()){
+    $('whoBox').innerHTML=`${sync}<b>${esc(student?student.name:'')}</b>의 공부 일정${isDemo?' · <span style="color:var(--warn)">데모</span>':''}`;
+    $('tools').innerHTML=`<button onclick="openTimetable()">시간표</button><button class="ghost" onclick="logoutStudent()" title="이 기기에서 코드 지우기">코드 변경</button>`;
+  }else{
+    $('whoBox').innerHTML=`${sync}선생님 화면${student?` · <b>${esc(student.name)}</b>`:''}${isDemo?' · <span style="color:var(--warn)">데모</span>':''}`;
+    $('tools').innerHTML=`${code?`<button onclick="openTimetable()">시간표</button><button onclick="openShare('${code}')">학생 링크</button>`:''}
+      <button class="primary" onclick="openShare()">+ 학생 추가</button><button class="ghost" onclick="linkDlg.showModal()">코드로 추가</button>`;
+  }
+  document.querySelectorAll('.student-only').forEach(el=>el.classList.toggle('hidden',!isStudent()));
+  $('tutorBar').classList.toggle('hidden',isStudent());
+  if(!isStudent()){
+    $('stuList').innerHTML=tutorList.length?tutorList.map(s=>`<button class="stu ${s.code===code?'sel':''}" onclick="selectStudent('${s.code}')">
+      <div class="nm">${esc(s.name||'학생')}</div><div class="st">${s.code===code?statusLine():'눌러서 보기'}</div></button>`).join('')
+      :'<div class="empty">아직 학생이 없어요. "+ 학생 추가"로 학생을 만들고 링크를 보내 주세요.</div>';
+  }
+  $('newTitle').placeholder=isStudent()?'할 일 입력 후 Enter':'숙제 내주기 (학생 화면에 표시돼요)';
+}
+function statusLine(){
+  const k=ymd(new Date());const td=tasks.filter(t=>t.date===k);
+  const over=tasks.filter(t=>t.date<k&&!t.done).length;
+  return `오늘 ${td.filter(t=>t.done).length}/${td.length} 완료${over?` · 밀린 ${over}`:''}`;
+}
+
+function tick(){
+  const now=new Date();
+  $('clock').innerHTML=`${pad(now.getHours())}:${pad(now.getMinutes())}<small>${pad(now.getSeconds())}</small>`;
+  $('todayStr').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${DAYS[now.getDay()]})`;
+  const key=ymd(now);
+  if(key!==lastToday){if(ymd(sel)===lastToday)sel=startOfDay(now);lastToday=key;renderAll();}
+  if(now.getSeconds()===0)renderAll();
+}
+
+function renderNow(){
+  const now=new Date(),nm=now.getHours()*60+now.getMinutes(),k=ymd(now);
+  if(!code){$('nowCards').innerHTML='';return;}
+  const items=[
+    ...classesOn(now).map(c=>({name:c.name,sub:c.room,s:toMin(c.start),e:toMin(c.end),start:c.start,end:c.end,kind:'일정'})),
+    ...tasks.filter(t=>t.date===k&&t.time&&!t.done).map(t=>({name:t.title,sub:t.note,s:toMin(t.time),e:toMin(t.time),start:t.time,kind:'할 일'}))
+  ].sort((a,b)=>a.s-b.s);
+  const cur=items.find(i=>i.kind==='일정'&&i.s<=nm&&nm<i.e);
+  const next=items.find(i=>i.s>nm);
+  let h='';
+  if(cur){const pct=Math.round((nm-cur.s)/(cur.e-cur.s)*100);
+    h+=`<div class="card now"><div class="lbl">지금 · ${cur.start}–${cur.end}</div><div class="ttl">${esc(cur.name)}</div>
+      <div class="sub">${cur.sub?esc(cur.sub)+' · ':''}${fmtDur(cur.e-nm)} 남음</div><div class="progress"><div style="width:${pct}%"></div></div></div>`;}
+  if(next)h+=`<div class="card"><div class="lbl">다음 ${next.kind} · ${next.start}</div><div class="ttl">${esc(next.name)}</div>
+      <div class="sub">${next.sub?esc(next.sub)+' · ':''}${fmtDur(next.s-nm)} 후</div></div>`;
+  if(!cur&&!next)h=`<div class="card none"><div class="ttl" style="font-size:15px">오늘 남은 일정이 없어요</div></div>`;
+  const td=tasks.filter(t=>t.date===k),left=td.filter(t=>!t.done).length,over=tasks.filter(t=>t.date<k&&!t.done).length;
+  h+=`<div class="card none"><div class="lbl">오늘 할 일</div><div class="ttl">${td.length-left} / ${td.length} 완료</div></div>`;
+  if(over)h+=`<div class="card alert"><div class="lbl">밀린 할 일</div><div class="ttl">${over}개</div></div>`;
+  if(!isStudent()&&student&&student.updatedAt){const m=Math.round((Date.now()-student.updatedAt)/60000);
+    h+=`<div class="card none"><div class="lbl">학생 마지막 수정</div><div class="ttl" style="font-size:15px">${m<1?'방금':m<60?m+'분 전':m<1440?Math.round(m/60)+'시간 전':Math.round(m/1440)+'일 전'}</div></div>`;}
+  $('nowCards').innerHTML=h;
+}
+
+function renderAll(){
+  renderTop();
+  const key=ymd(sel),isToday=key===ymd(new Date());
+  $('selTitle').textContent=fmtDate(sel)+(isToday?' 오늘':'');
+  $('clsHead').textContent=`${DAYS[sel.getDay()]}요일 일정`;
+  $('taskHead').textContent=isStudent()?'할 일':'할 일 · 숙제';
+  $('mainArea').style.visibility=code?'visible':'hidden';
+  $('week').style.visibility=code?'visible':'hidden';
+  if(!code){$('nowCards').innerHTML='';return;}
+
+  const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+  const cls=classesOn(sel);
+  $('classList').innerHTML=cls.length?cls.map(c=>{
+    let st='';if(isToday){if(toMin(c.start)<=nm&&nm<toMin(c.end))st='cur';else if(toMin(c.end)<=nm)st='past';}
+    return `<div class="cls ${st} ${isStudent()?'click':''}" ${isStudent()?`onclick="openClass('${c.id}')"`:''}><div class="bar" style="background:${c.color}"></div>
+      <div class="t">${c.start}–${c.end}</div><div><div class="n">${esc(c.name)}</div>${c.room?`<div class="r">${esc(c.room)}</div>`:''}</div></div>`;
+  }).join(''):`<div class="empty">${classes().length?'이 날은 일정이 없어요.':isStudent()?'아직 시간표가 없어요. "+ 수업 추가"로 학교·학원 시간표를 넣어 주세요.':'학생이 아직 시간표를 넣지 않았어요.'}</div>`;
+
+  const list=tasksOn(key);
+  let h=list.length?list.map(t=>taskRow(t)).join(''):`<div class="empty">${isStudent()?'할 일이 없어요.':'이 날 할 일이 없어요.'}</div>`;
+  if(isToday){
+    const over=tasks.filter(t=>t.date<key&&!t.done).sort((a,b)=>a.date<b.date?-1:1);
+    if(over.length)h+=`<div class="section">밀린 할 일 ${over.length}개</div>`+over.map(t=>taskRow(t,true)).join('');
+  }
+  $('taskList').innerHTML=h;
+
+  const mon=new Date(sel);mon.setDate(sel.getDate()-((sel.getDay()+6)%7));
+  let w='';
+  for(let i=0;i<7;i++){
+    const d=new Date(mon);d.setDate(mon.getDate()+i);const k=ymd(d);
+    const dt=tasks.filter(t=>t.date===k);
+    w+=`<div class="day ${k===key?'sel':''} ${k===ymd(new Date())?'is-today':''}" onclick="selectDay('${k}')">
+      <div class="d">${DAYS[d.getDay()]} ${d.getMonth()+1}/${d.getDate()}</div>
+      <div class="s">일정 ${classesOn(d).length} · ${dt.filter(t=>t.done).length}/${dt.length}</div></div>`;
+  }
+  $('week').innerHTML=w;
+  renderNow();
+}
+
+function taskRow(t,overdue){
+  const d=parseYmd(t.date),np=(t.proofs||[]).length;
+  const check=isStudent()
+    ?`<input type="checkbox" ${t.done?'checked':''} onchange="toggleTask('${t.id}')" title="${t.done?'완료 취소':'사진 인증을 올리면 완료돼요'}">`
+    :`<span class="chk ${t.done?'on':''}" title="${t.done?'완료':'미완료'}">${t.done?'✓':''}</span>`;
+  const canEdit=isStudent()||t.by==='tutor';
+  return `<div class="task ${t.done?'done':''}">${check}
+    <div class="body" onclick="${canEdit?`openTask('${t.id}')`:np?`openProof('${t.id}')`:''}">
+      <div class="title">${t.time?`<span class="time">${t.time}</span>`:''}${esc(t.title)}${t.by==='tutor'?'<span class="tag hw">숙제</span>':''}${np?`<span class="tag pf" onclick="event.stopPropagation();openProof('${t.id}')" title="인증 사진 보기">📷 ${np}</span>`:''}</div>
+      ${(t.note||overdue)?`<div class="meta">${overdue?`${d.getMonth()+1}/${d.getDate()} · `:''}${esc(t.note||'')}</div>`:''}
+    </div>
+    ${overdue&&isStudent()?`<button class="ghost" onclick="moveToToday('${t.id}')">오늘로</button>`:''}
+    ${canEdit?`<button class="ghost" onclick="openTask('${t.id}')" title="수정">✎</button>`:''}
+  </div>`;
+}
+
+/* ---------- 날짜 ---------- */
+function shiftDay(n){sel.setDate(sel.getDate()+n);renderAll();}
+function goToday(){sel=startOfDay(new Date());renderAll();}
+function selectDay(k){sel=parseYmd(k);renderAll();}
+
+/* ---------- 할 일 ---------- */
+async function addTask(e){
+  e.preventDefault();if(!code)return;
+  const title=$('newTitle').value.trim();if(!title)return;
+  const t={id:uid(),date:ymd(sel),time:$('newTime').value||'',title,note:'',done:false,by:isStudent()?'student':'tutor',proofs:[],createdAt:Date.now()};
+  $('newTitle').value='';$('newTime').value='';
+  tasks.push(t);renderAll();
+  await safe(store.putTask(code,t)).catch(()=>{});
+  $('newTitle').focus();
+}
+async function toggleTask(id){
+  const t=findTask(id);if(!t||!isStudent())return;
+  if(t.done){t.done=false;renderAll();await safe(store.putTask(code,t)).catch(()=>{});return;}
+  renderAll();openProof(id);
+}
+async function moveToToday(id){const t=findTask(id);if(!t)return;t.date=ymd(new Date());renderAll();await safe(store.putTask(code,t)).catch(()=>{});}
+function openTask(id){
+  const t=findTask(id);if(!t)return;editTaskId=id;
+  $('tHead').textContent=t.by==='tutor'?(isStudent()?'선생님이 낸 숙제':'숙제 수정'):'할 일 수정';
+  $('tTitle').value=t.title;$('tDate').value=t.date;$('tTime').value=t.time||'';$('tNote').value=t.note||'';
+  const ro=isStudent()&&t.by==='tutor';     // 학생은 숙제 내용을 못 바꿈(날짜·메모만)
+  $('tTitle').readOnly=ro;$('tDel').classList.toggle('hidden',ro);
+  const n=(t.proofs||[]).length;
+  $('tProofBtn').textContent=n?`📷 인증 사진 ${n}장 보기`:(isStudent()?'📷 공부 인증 사진 올리기':'인증 사진 없음');
+  $('tProofBtn').disabled=!isStudent()&&!n;
+  taskDlg.showModal();
+}
+async function saveTask(){
+  const t=findTask(editTaskId);if(!t)return;
+  if(!$('tTitle').value.trim()){$('tTitle').focus();return;}
+  t.title=$('tTitle').value.trim();t.date=$('tDate').value||t.date;t.time=$('tTime').value||'';t.note=$('tNote').value.trim();
+  taskDlg.close();renderAll();await safe(store.putTask(code,t)).catch(()=>{});
+}
+async function deleteTask(){
+  const t=findTask(editTaskId);if(!t||!confirm('이 할 일을 삭제할까요?'))return;
+  taskDlg.close();tasks=tasks.filter(x=>x.id!==t.id);renderAll();
+  for(const p of t.proofs||[])store.delProof(code,p.id).catch(()=>{});
+  await safe(store.delTask(code,t.id)).catch(()=>{});
+}
+
+/* ---------- 공부 인증 (사진을 압축해서 저장) ---------- */
+async function compress(file){
+  let bmp;
+  try{bmp=await createImageBitmap(file);}
+  catch(e){
+    bmp=await new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=URL.createObjectURL(file);});
+  }
+  let max=1400,q=.72,out='';
+  for(let i=0;i<6;i++){
+    const w=bmp.width,h=bmp.height,s=Math.min(1,max/Math.max(w,h));
+    const cv=document.createElement('canvas');cv.width=Math.round(w*s);cv.height=Math.round(h*s);
+    cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+    out=cv.toDataURL('image/jpeg',q);
+    if(out.length<700000)return out;     // Firestore 문서 1MB 제한 안쪽으로
+    max=Math.round(max*.8);q=Math.max(.5,q-.06);
+  }
+  return out;
+}
+const proofCache=new Map();
+function openProof(id){
+  const t=findTask(id);if(!t)return;proofTaskId=id;
+  const n=(t.proofs||[]).length;
+  $('pHead').textContent=isStudent()?(t.done?'공부 인증 사진':'공부 인증하고 완료하기'):'인증 사진';
+  $('pMsg').textContent=isStudent()?`"${t.title}" — 사진을 1장 이상 올려야 완료로 바뀌어요. 선생님도 이 사진을 볼 수 있어요.`
+    :`"${t.title}" · ${t.done?'완료':'미완료'} · 사진 ${n}장${t.doneAt?` · ${new Date(t.doneAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 완료`:''}`;
+  renderProofs();proofDlg.showModal();
+}
+async function renderProofs(){
+  const t=findTask(proofTaskId);if(!t)return;const ps=t.proofs||[];
+  $('proofList').innerHTML=ps.map((p,i)=>`<div class="pf" onclick="viewProof(${i})" title="${esc(p.name)}">
+    <div class="th" id="th_${p.id}">불러오는 중…</div><div class="nm">${esc(p.name)}</div>
+    ${isStudent()?`<button class="x" onclick="event.stopPropagation();removeProof(${i})" title="삭제">✕</button>`:''}</div>`).join('')
+    ||(isStudent()?'':'<div class="empty">아직 인증 사진이 없어요.</div>');
+  $('pDone').classList.toggle('hidden',!isStudent()||t.done);
+  $('pDone').disabled=!ps.length;
+  for(const p of ps){
+    let data=proofCache.get(p.id);
+    if(!data){try{const r=await store.getProof(code,p.id);data=r&&r.data;if(data)proofCache.set(p.id,data);}catch(e){}}
+    const el=$('th_'+p.id);if(el)el.innerHTML=data?`<img src="${data}" alt="">`:'사진 없음';
+  }
+}
+async function addProofFiles(files){
+  if(!findTask(proofTaskId)||!files||!files.length)return;
+  const added=[];
+  for(const f of files){
+    if(!/^image\//.test(f.type)&&!/\.(heic|heif)$/i.test(f.name)){toast(`"${f.name}"은(는) 사진이 아니에요`);continue;}
+    try{
+      toast('사진 올리는 중…');
+      const data=await compress(f);
+      const p={id:uid(),taskId:proofTaskId,name:f.name,data,at:Date.now()};
+      await store.putProof(code,p);proofCache.set(p.id,data);
+      added.push({id:p.id,name:p.name,at:p.at});
+    }catch(e){console.error(e);toast(`"${f.name}"을(를) 올리지 못했어요`);}
+  }
+  const t=findTask(proofTaskId);if(!t||!added.length)return;   // 업로드 중 동기화로 바뀐 최신 상태에 합치기
+  t.proofs=[...(t.proofs||[]),...added];
+  renderAll();renderProofs();
+  await safe(store.putTask(code,t)).catch(()=>{});
+}
+function viewProof(i){
+  const t=findTask(proofTaskId);const p=t&&(t.proofs||[])[i];if(!p)return;
+  const data=proofCache.get(p.id);if(!data)return;
+  $('viewerImg').src=data;viewer.showModal();
+}
+async function removeProof(i){
+  const t=findTask(proofTaskId);if(!t||!confirm('이 사진을 삭제할까요?'))return;
+  const [p]=t.proofs.splice(i,1);
+  if(!t.proofs.length&&t.done){t.done=false;delete t.doneAt;toast('인증 사진이 없어져서 미완료로 바뀌었어요');}
+  renderAll();renderProofs();
+  store.delProof(code,p.id).catch(()=>{});
+  await safe(store.putTask(code,t)).catch(()=>{});
+}
+async function completeWithProof(){
+  const t=findTask(proofTaskId);if(!t||!(t.proofs||[]).length)return;
+  t.done=true;t.doneAt=Date.now();proofDlg.close();renderAll();
+  await safe(store.putTask(code,t)).catch(()=>{});
+}
+const drop=$('drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');addProofFiles(e.dataTransfer.files);});
+window.addEventListener('dragover',e=>e.preventDefault());
+window.addEventListener('drop',e=>e.preventDefault());
+
+/* ---------- 시간표 (학생만 수정) ---------- */
+$('cDay').innerHTML=WEEK_ORDER.map(d=>`<option value="${d}">${DAYS[d]}요일</option>`).join('');
+function drawColors(){$('cColors').innerHTML=COLORS.map(c=>`<span style="background:${c}" class="${c===pickColor?'on':''}" onclick="pickColorSet('${c}')"></span>`).join('');}
+function pickColorSet(c){pickColor=c;drawColors();}
+function openClass(id){
+  if(!isStudent())return;
+  const c=id?classes().find(x=>x.id===id):null;editClassId=c?c.id:null;
+  $('cHead').textContent=c?'일정 수정':'수업/학원 추가';
+  $('cName').value=c?c.name:'';$('cDay').value=c?c.day:sel.getDay();
+  $('cStart').value=c?c.start:'09:00';$('cEnd').value=c?c.end:'10:00';$('cRoom').value=c?c.room||'':'';
+  pickColor=c?c.color:COLORS[classes().length%COLORS.length];drawColors();
+  $('cDel').classList.toggle('hidden',!c);
+  classDlg.showModal();
+}
+async function saveClass(){
+  const name=$('cName').value.trim();if(!name){$('cName').focus();return;}
+  if(!$('cStart').value||!$('cEnd').value||toMin($('cEnd').value)<=toMin($('cStart').value)){alert('끝나는 시간이 시작 시간보다 늦어야 해요.');return;}
+  const data={name,day:Number($('cDay').value),start:$('cStart').value,end:$('cEnd').value,room:$('cRoom').value.trim(),color:pickColor};
+  let list=classes().slice();
+  if(editClassId)list=list.map(x=>x.id===editClassId?{...x,...data}:x);else list.push({id:uid(),...data});
+  student={...student,classes:list};classDlg.close();renderAll();if(ttDlg.open)renderTimetable();
+  await safe(store.saveStudent(code,{classes:list})).catch(()=>{});
+}
+async function deleteClass(){
+  if(!confirm('이 일정을 시간표에서 삭제할까요?'))return;
+  const list=classes().filter(x=>x.id!==editClassId);
+  student={...student,classes:list};classDlg.close();renderAll();if(ttDlg.open)renderTimetable();
+  await safe(store.saveStudent(code,{classes:list})).catch(()=>{});
+}
+function openTimetable(){renderTimetable();ttDlg.showModal();}
+function renderTimetable(){
+  let h='';
+  for(const d of WEEK_ORDER){
+    const cs=classes().filter(c=>c.day===d).sort((a,b)=>toMin(a.start)-toMin(b.start));
+    if(!cs.length)continue;
+    h+=`<div class="ttDay">${DAYS[d]}요일</div>`+cs.map(c=>`<div class="cls ${isStudent()?'click':''}" ${isStudent()?`onclick="openClass('${c.id}')"`:''}><div class="bar" style="background:${c.color}"></div>
+      <div class="t">${c.start}–${c.end}</div><div><div class="n">${esc(c.name)}</div>${c.room?`<div class="r">${esc(c.room)}</div>`:''}</div></div>`).join('');
+  }
+  $('ttList').innerHTML=h||'<div class="empty">등록된 시간표가 없어요.</div>';
+}
+
+/* ---------- 선생님: 학생 관리 ---------- */
+function selectStudent(c){attach(c);}
+function studentLink(c){const u=new URL(location.href);u.search='';if(isDemo)u.searchParams.set('demo','1');u.searchParams.set('s',c);return u.toString();}
+function openShare(c){
+  const existing=c?tutorList.find(x=>x.code===c):null;
+  $('shHead').textContent=existing?`${existing.name} 학생 링크`:'학생 추가';
+  $('shNew').classList.toggle('hidden',!!existing);$('shDone').classList.toggle('hidden',!existing);
+  $('shCreate').classList.toggle('hidden',!!existing);$('shRemove').classList.toggle('hidden',!existing);
+  $('shName').value='';
+  if(existing){$('shLink').value=studentLink(c);$('shCode').value=c;}
+  shareDlg.dataset.code=c||'';
+  shareDlg.showModal();if(!existing)$('shName').focus();
+}
+async function createStudent(){
+  const name=$('shName').value.trim();if(!name){$('shName').focus();return;}
+  const c=newCode();
+  $('shCreate').disabled=true;
+  try{await store.create(c,name);}catch(e){console.error(e);toast('만들지 못했어요. 인터넷/설정을 확인해 주세요');$('shCreate').disabled=false;return;}
+  $('shCreate').disabled=false;
+  tutorList.push({code:c,name});lsSet(LS.tutor,tutorList);
+  $('shHead').textContent=`${name} 학생 링크`;
+  $('shNew').classList.add('hidden');$('shDone').classList.remove('hidden');$('shCreate').classList.add('hidden');
+  $('shLink').value=studentLink(c);$('shCode').value=c;shareDlg.dataset.code=c;
+  attach(c);
+}
+function removeStudent(){
+  const c=shareDlg.dataset.code;if(!c||!confirm('내 목록에서 이 학생을 뺄까요? (학생 데이터는 지워지지 않고, 코드로 다시 추가할 수 있어요)'))return;
+  tutorList=tutorList.filter(x=>x.code!==c);lsSet(LS.tutor,tutorList);shareDlg.close();
+  if(tutorList.length)attach(tutorList[0].code);else{unsubs.forEach(f=>f&&f());unsubs=[];code=null;student=null;tasks=[];renderAll();}
+}
+async function linkStudent(){
+  const c=normCode($('lkCode').value);if(c.length<10){toast('코드를 확인해 주세요');return;}
+  if(tutorList.some(x=>x.code===c)){linkDlg.close();attach(c);return;}
+  try{if(!(await store.exists(c))){toast('없는 코드예요');return;}}catch(e){toast('연결에 실패했어요');return;}
+  tutorList.push({code:c,name:'학생'});lsSet(LS.tutor,tutorList);linkDlg.close();$('lkCode').value='';attach(c);
+}
+
+/* 인라인 onclick에서 쓰는 함수들 */
+Object.assign(window,{startDemo,enterCode,goTutor,logoutStudent,openTimetable,openShare,createStudent,removeStudent,linkStudent,
+  selectStudent,shiftDay,goToday,selectDay,addTask,toggleTask,moveToToday,openTask,saveTask,deleteTask,openProof,addProofFiles,
+  viewProof,removeProof,completeWithProof,openClass,saveClass,deleteClass,pickColorSet,copyText,
+  openProofEdit:()=>openProof(editTaskId)});
+
+boot();tick();setInterval(tick,1000);
+</script>
+</body>
+</html>
